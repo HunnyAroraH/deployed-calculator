@@ -32,7 +32,7 @@ os.environ["PATH"] += os.pathsep + os.getcwd()
 
 @app.route("/")
 def index():
-    return render_template('index.html')
+    return "Flask backend is running"
 
 def kill_processes():
     for process in psutil.process_iter(['pid', 'name']):
