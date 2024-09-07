@@ -89,31 +89,8 @@ def fetch_service_links(ibo_number, max_retries=3):
     logger.error(f"Failed to fetch service links after {max_retries} attempts")
     return []
 
-@app.route('/scrape-service-links', methods=['POST'])
-def scrape_service_links():
+def fetch_shop_links(ibo_number, max_retries=3):
     try:
-        data = request.get_json()
-        ibo_number = data.get('iboNumber')
-        logger.info(f"Received IBO number: {ibo_number}")
-
-        service_links = fetch_service_links(ibo_number)
-
-        if not service_links:
-            return jsonify({'error': 'Failed to fetch service links after multiple attempts'}), 500
-
-        return jsonify({'service_links': service_links})
-
-    except Exception as e:
-        logger.error(f"An error occurred: {e}")
-        kill_processes()  # Ensure processes are killed even in case of error
-        return jsonify({'error': 'An error occurred'}), 500
-
-@app.route('/scrape-shop-links', methods=['POST'])
-def scrape_shop_links():
-    try:
-        data = request.get_json()
-        ibo_number = data.get('iboNumber')
-
         # Load service links from the JSON file
         json_filename = f"service_links_{ibo_number}.json"
         with open(json_filename, 'r') as f:
@@ -123,7 +100,7 @@ def scrape_shop_links():
 
         for service_link in service_links:
             retry_count = 0
-            while retry_count < 3:
+            while retry_count < max_retries:
                 try:
                     options = webdriver.ChromeOptions()
                     options.add_argument('--headless')
@@ -157,6 +134,32 @@ def scrape_shop_links():
                     driver.quit()
                     kill_processes()  # Ensure all processes are killed even if an error occurs
 
+        return shop_links
+
+    except Exception as e:
+        logger.error(f"An error occurred while fetching shop links: {e}")
+        return []
+
+@app.route('/scrape-service-links', methods=['POST'])
+def scrape_service_links():
+    try:
+        data = request.get_json()
+        ibo_number = data.get('iboNumber')
+        logger.info(f"Received IBO number: {ibo_number}")
+
+        # Step 1: Fetch service links
+        service_links = fetch_service_links(ibo_number)
+
+        if not service_links:
+            return jsonify({'error': 'Failed to fetch service links after multiple attempts'}), 500
+
+        # Step 2: Fetch shop links automatically after service links are fetched
+        shop_links = fetch_shop_links(ibo_number)
+
+        if not shop_links:
+            return jsonify({'error': 'Failed to fetch shop links after multiple attempts'}), 500
+
+        # Return the shop links as the final response
         return jsonify({'shop_links': shop_links})
 
     except Exception as e:
