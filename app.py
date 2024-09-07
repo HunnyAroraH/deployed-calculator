@@ -49,6 +49,8 @@ def fetch_service_links(ibo_number, max_retries=3):
             options.add_argument('--no-sandbox')
             options.add_argument('--disable-dev-shm-usage')
             options.add_argument('--disable-gpu')
+            options.add_argument('--disable-setuid-sandbox')
+            options.add_argument('--remote-debugging-port=9222')
             options.binary_location = chrome_binary_path
 
             service = ChromeService(executable_path=chromedriver_path)
