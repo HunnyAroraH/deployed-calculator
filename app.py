@@ -25,7 +25,7 @@ if platform.system() == "Windows":
     chrome_binary_path = "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe"
 else:
     chromedriver_path = "/usr/local/bin/chromedriver"
-    chrome_binary_path = "/usr/bin/google-chrome"
+    chrome_binary_path = "/usr/local/bin/chrome"
 
 # Set the PATH environment variable to include the directory with chromedriver
 os.environ["PATH"] += os.pathsep + os.getcwd()
