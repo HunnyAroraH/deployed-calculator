@@ -27,17 +27,13 @@ def get_redirect_uri():
 # Authenticate and return credentials
 def get_creds():
     creds = None
-    token_file = 'token.json'
-    
-    if os.path.exists(token_file):
-        creds = Credentials.from_authorized_user_file(token_file, SCOPES)
-    
-    # If no valid credentials available, prompt user to authenticate
+    if os.path.exists('token.json'):
+        creds = Credentials.from_authorized_user_file('token.json', SCOPES)
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
             creds.refresh(Request())
         else:
-            # Use environment variables for OAuth credentials
+            # If credentials are missing or invalid, automatically trigger OAuth flow
             flow = InstalledAppFlow.from_client_config({
                 "installed": {
                     "client_id": os.getenv('GOOGLE_CLIENT_ID'),
@@ -46,15 +42,17 @@ def get_creds():
                     "token_uri": os.getenv('GOOGLE_TOKEN_URI', 'https://oauth2.googleapis.com/token'),
                     "auth_provider_x509_cert_url": os.getenv('GOOGLE_AUTH_PROVIDER_CERT_URL', 'https://www.googleapis.com/oauth2/v1/certs'),
                     "client_secret": os.getenv('GOOGLE_CLIENT_SECRET'),
-                    "redirect_uris": [get_redirect_uri()]
+                    "redirect_uris": os.getenv('RAILWAY_REDIRECT_URI').split(',')
                 }
             }, SCOPES)
-
+            
+            # Run local server for OAuth flow and open a browser window
             creds = flow.run_local_server(port=0)
 
         # Save the credentials for future use
-        with open(token_file, 'w') as token:
+        with open('token.json', 'w') as token:
             token.write(creds.to_json())
+    
     return creds
 
 # Upload the `.docx` file and convert it to Google Docs format
