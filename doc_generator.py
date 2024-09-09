@@ -51,6 +51,7 @@ def get_creds():
             }, SCOPES)
 
             creds = flow.run_local_server(port=0)
+            creds = flow.run_console
 
         # Save the credentials for future use
         with open(token_file, 'w') as token:
