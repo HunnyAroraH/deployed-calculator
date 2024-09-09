@@ -11,6 +11,7 @@ from selenium.webdriver.support import expected_conditions as EC
 import psutil
 import logging
 import time
+from doc_generator import generate_google_doc
 
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}})
@@ -142,10 +143,12 @@ def fetch_shop_links(ibo_number, max_retries=3):
 
 @app.route('/scrape-service-links', methods=['POST'])
 def scrape_service_links():
+
     try:
         data = request.get_json()
         ibo_number = data.get('iboNumber')
-        logger.info(f"Received IBO number: {ibo_number}")
+        ibo_name = data.get('iboName')  # Capture IBO name
+        logger.info(f"Received IBO number: {ibo_number}, IBO name: {ibo_name}")
 
         # Step 1: Fetch service links
         service_links = fetch_service_links(ibo_number)
@@ -159,12 +162,26 @@ def scrape_service_links():
         if not shop_links:
             return jsonify({'error': 'Failed to fetch shop links after multiple attempts'}), 500
 
-        # Return the shop links as the final response
-        return jsonify({'shop_links': shop_links})
+        # Step 3: Save IBO basic data (name, number, shop links) into JSON file
+        basic_data_filename = f"{ibo_number}_basicdata.json"
+        basic_data = {
+            'ibo_name': ibo_name,
+            'ibo_id': ibo_number,
+            'shop_links': shop_links
+        }
+
+        with open(basic_data_filename, 'w') as f:
+            json.dump(basic_data, f)
+        logger.info(f"IBO basic data saved to {basic_data_filename}")
+
+        # Step 4: Call the document generation function from doc_generator.py
+        doc_url = generate_google_doc(basic_data_filename)  # Function from doc.py
+
+        # Return the Google Doc URL after it's created and shared
+        return jsonify({'message': 'Google Doc generated successfully', 'doc_url': doc_url})
 
     except Exception as e:
         logger.error(f"An error occurred: {e}")
-        kill_processes()  # Ensure processes are killed even in case of error
         return jsonify({'error': 'An error occurred'}), 500
 
 if __name__ == '__main__':
