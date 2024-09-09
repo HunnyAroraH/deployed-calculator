@@ -10,6 +10,7 @@ from dotenv import load_dotenv
 from flask import Flask, redirect, session, url_for, request
 
 app = Flask(__name__)
+app.secret_key = "hulabula"  # Ensure you have this in your environment
 
 # Load environment variables (for local development and deployment)
 load_dotenv()
