@@ -6,6 +6,10 @@ from google_auth_oauthlib.flow import InstalledAppFlow
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
 from google.auth.transport.requests import Request
+from dotenv import load_dotenv
+
+# Load environment variables (for local development and deployment)
+load_dotenv()
 
 # Scopes for Google Drive and Docs APIs
 SCOPES = ['https://www.googleapis.com/auth/drive', 'https://www.googleapis.com/auth/documents']
@@ -22,8 +26,19 @@ def get_creds():
         if creds and creds.expired and creds.refresh_token:
             creds.refresh(Request())
         else:
-            flow = InstalledAppFlow.from_client_secrets_file('credentials.json', SCOPES)
-            creds = flow.run_local_server(port=0)
+            # Use environment variables for OAuth credentials
+            creds = InstalledAppFlow.from_client_config({
+                "installed": {
+                    "client_id": os.getenv('GOOGLE_CLIENT_ID'),
+                    "project_id": os.getenv('GOOGLE_PROJECT_ID'),
+                    "auth_uri": os.getenv('GOOGLE_AUTH_URI', 'https://accounts.google.com/o/oauth2/auth'),
+                    "token_uri": os.getenv('GOOGLE_TOKEN_URI', 'https://oauth2.googleapis.com/token'),
+                    "auth_provider_x509_cert_url": os.getenv('GOOGLE_AUTH_PROVIDER_CERT_URL', 'https://www.googleapis.com/oauth2/v1/certs'),
+                    "client_secret": os.getenv('GOOGLE_CLIENT_SECRET'),
+                    "redirect_uris": os.getenv('GOOGLE_REDIRECT_URIS', 'http://localhost:5000/').split(',')
+                }
+            }, SCOPES).run_local_server(port=0)
+
         # Save the credentials for future use
         with open('token.json', 'w') as token:
             token.write(creds.to_json())
