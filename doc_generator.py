@@ -7,6 +7,7 @@ from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
 from google.auth.transport.requests import Request
 from dotenv import load_dotenv
+import threading
 
 # Load environment variables (for local development and deployment)
 load_dotenv()
@@ -193,17 +194,26 @@ def generate_google_doc(basic_data_filename):
     ibo_id = links_data['ibo_id']
 
     # Step 3: Upload and convert the template to Google Docs format
-    template_file = 'ServiceLinkTemplate.docx'
-    document_id = upload_and_convert_to_gdoc(drive_service, template_file)
+    document_id = upload_and_convert_to_gdoc(drive_service, 'ServiceLinkTemplate.docx')
 
-    # Step 4: Replace placeholders with "Click here" text
-    replace_with_click_here(docs_service, document_id, tag_to_link)
+    # Create threads for link generation and IBO details
+    def link_generation():
+        replace_with_click_here(docs_service, document_id, tag_to_link)
+        apply_hyperlinks(docs_service, document_id, tag_to_link)
+    
+    def ibo_details_update():
+        replace_ibo_details(docs_service, document_id, ibo_name, ibo_id)
 
-    # Step 5: Apply hyperlinks and bold styling to "Click here" text
-    apply_hyperlinks(docs_service, document_id, tag_to_link)
+    link_thread = threading.Thread(target=link_generation)
+    ibo_thread = threading.Thread(target=ibo_details_update)
 
-    # Step 6: Replace IBO details
-    replace_ibo_details(docs_service, document_id, ibo_name, ibo_id)
+    # Start link generation thread first
+    link_thread.start()
+    # Wait for link generation to complete before updating IBO details
+    link_thread.join()
+    # Start and finish the IBO thread after link generation
+    ibo_thread.start()
+    ibo_thread.join()
 
     # Step 7: Share the Google Doc publicly
     share_google_doc(drive_service, document_id)
