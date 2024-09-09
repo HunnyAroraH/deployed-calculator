@@ -15,7 +15,6 @@ load_dotenv()
 SCOPES = ['https://www.googleapis.com/auth/drive', 'https://www.googleapis.com/auth/documents']
 
 # Set up logging for debugging
-logging.basicConfig(level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
 
 # Authenticate and return credentials
 def get_creds():
