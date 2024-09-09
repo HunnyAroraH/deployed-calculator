@@ -15,18 +15,30 @@ load_dotenv()
 SCOPES = ['https://www.googleapis.com/auth/drive', 'https://www.googleapis.com/auth/documents']
 
 # Set up logging for debugging
+logging.basicConfig(level=logging.INFO)
+
+# Function to get the correct redirect URI based on the environment
+def get_redirect_uri():
+    if os.getenv("RAILWAY_ENVIRONMENT"):  # If running on Railway
+        return os.getenv('RAILWAY_PUBLIC_DOMAIN')  # Set Railway redirect URI in environment
+    else:
+        return 'http://localhost:5000/'  # Local development
 
 # Authenticate and return credentials
 def get_creds():
     creds = None
-    if os.path.exists('token.json'):
-        creds = Credentials.from_authorized_user_file('token.json', SCOPES)
+    token_file = 'token.json'
+    
+    if os.path.exists(token_file):
+        creds = Credentials.from_authorized_user_file(token_file, SCOPES)
+    
+    # If no valid credentials available, prompt user to authenticate
     if not creds or not creds.valid:
         if creds and creds.expired and creds.refresh_token:
             creds.refresh(Request())
         else:
             # Use environment variables for OAuth credentials
-            creds = InstalledAppFlow.from_client_config({
+            flow = InstalledAppFlow.from_client_config({
                 "installed": {
                     "client_id": os.getenv('GOOGLE_CLIENT_ID'),
                     "project_id": os.getenv('GOOGLE_PROJECT_ID'),
@@ -34,12 +46,14 @@ def get_creds():
                     "token_uri": os.getenv('GOOGLE_TOKEN_URI', 'https://oauth2.googleapis.com/token'),
                     "auth_provider_x509_cert_url": os.getenv('GOOGLE_AUTH_PROVIDER_CERT_URL', 'https://www.googleapis.com/oauth2/v1/certs'),
                     "client_secret": os.getenv('GOOGLE_CLIENT_SECRET'),
-                    "redirect_uris": os.getenv('GOOGLE_REDIRECT_URIS', 'http://localhost:5000/').split(',')
+                    "redirect_uris": [get_redirect_uri()]
                 }
-            }, SCOPES).run_local_server(port=0)
+            }, SCOPES)
+
+            creds = flow.run_local_server(port=0)
 
         # Save the credentials for future use
-        with open('token.json', 'w') as token:
+        with open(token_file, 'w') as token:
             token.write(creds.to_json())
     return creds
 
