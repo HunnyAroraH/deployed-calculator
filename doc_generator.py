@@ -42,7 +42,7 @@ def get_creds():
                     "token_uri": os.getenv('GOOGLE_TOKEN_URI', 'https://oauth2.googleapis.com/token'),
                     "auth_provider_x509_cert_url": os.getenv('GOOGLE_AUTH_PROVIDER_CERT_URL', 'https://www.googleapis.com/oauth2/v1/certs'),
                     "client_secret": os.getenv('GOOGLE_CLIENT_SECRET'),
-                    "redirect_uris": os.getenv('RAILWAY_REDIRECT_URI').split(',')
+                    "redirect_uris": os.getenv('RAILWAY_PUBLIC_DOMAIN').split(',')
                 }
             }, SCOPES)
             
