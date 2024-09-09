@@ -14,7 +14,6 @@ import time
 from doc_generator import generate_google_doc
 
 app = Flask(__name__)
-app.secret_key = os.getenv('FLASK_SECRET_KEY', 'your_fallback_secret_key')
 CORS(app, resources={r"/*": {"origins": "*"}})
 
 # Setup logging
