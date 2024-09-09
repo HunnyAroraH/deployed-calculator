@@ -2,11 +2,14 @@ import os
 import logging
 import json
 from google.oauth2.credentials import Credentials
-from google_auth_oauthlib.flow import InstalledAppFlow
+from google_auth_oauthlib.flow import InstalledAppFlow, Flow
 from googleapiclient.discovery import build
 from googleapiclient.http import MediaFileUpload
 from google.auth.transport.requests import Request
 from dotenv import load_dotenv
+from flask import Flask, redirect, session, url_for, request
+
+app = Flask(__name__)
 
 # Load environment variables (for local development and deployment)
 load_dotenv()
@@ -17,49 +20,103 @@ SCOPES = ['https://www.googleapis.com/auth/drive', 'https://www.googleapis.com/a
 # Set up logging for debugging
 logging.basicConfig(level=logging.INFO)
 
+
 # Function to get the correct redirect URI based on the environment
 def get_redirect_uri():
     if os.getenv("RAILWAY_ENVIRONMENT"):  # If running on Railway
-        return os.getenv('RAILWAY_PUBLIC_DOMAIN')  # Set Railway redirect URI in environment
+        return os.getenv('RAILWAY_REDIRECT_URI')  # Set Railway redirect URI in environment
     else:
-        return 'http://localhost:5000/'  # Local development
+        return 'http://localhost:5000/oauth2callback'  # Local development
+
 
 # Authenticate and return credentials
 def get_creds():
     creds = None
-    if os.path.exists('token.json'):
+    # Check if we already have credentials stored in the session
+    if 'credentials' in session:
+        creds = Credentials(**session['credentials'])
+    elif os.path.exists('token.json'):
         creds = Credentials.from_authorized_user_file('token.json', SCOPES)
-    if not creds or not creds.valid:
-        if creds and creds.expired and creds.refresh_token:
-            creds.refresh(Request())
-        else:
-            # If credentials are missing or invalid, automatically trigger OAuth flow
-            flow = InstalledAppFlow.from_client_config({
-                "installed": {
-                    "client_id": os.getenv('GOOGLE_CLIENT_ID'),
-                    "project_id": os.getenv('GOOGLE_PROJECT_ID'),
-                    "auth_uri": os.getenv('GOOGLE_AUTH_URI', 'https://accounts.google.com/o/oauth2/auth'),
-                    "token_uri": os.getenv('GOOGLE_TOKEN_URI', 'https://oauth2.googleapis.com/token'),
-                    "auth_provider_x509_cert_url": os.getenv('GOOGLE_AUTH_PROVIDER_CERT_URL', 'https://www.googleapis.com/oauth2/v1/certs'),
-                    "client_secret": os.getenv('GOOGLE_CLIENT_SECRET'),
-                    "redirect_uris": os.getenv('RAILWAY_PUBLIC_DOMAIN').split(',')
-                }
-            }, SCOPES)
-            
-            # Run local server for OAuth flow and open a browser window
-            creds = flow.run_local_server(port=0)
 
-        # Save the credentials for future use
-        with open('token.json', 'w') as token:
-            token.write(creds.to_json())
-    
+    # Refresh the credentials if expired
+    if creds and creds.expired and creds.refresh_token:
+        creds.refresh(Request())
+    else:
+        # Use web flow instead of installed app flow
+        flow = Flow.from_client_config({
+            "web": {
+                "client_id": os.getenv('GOOGLE_CLIENT_ID'),
+                "project_id": os.getenv('GOOGLE_PROJECT_ID'),
+                "auth_uri": os.getenv('GOOGLE_AUTH_URI', 'https://accounts.google.com/o/oauth2/auth'),
+                "token_uri": os.getenv('GOOGLE_TOKEN_URI', 'https://oauth2.googleapis.com/token'),
+                "auth_provider_x509_cert_url": os.getenv('GOOGLE_AUTH_PROVIDER_CERT_URL', 'https://www.googleapis.com/oauth2/v1/certs'),
+                "client_secret": os.getenv('GOOGLE_CLIENT_SECRET'),
+                "redirect_uris": [get_redirect_uri()]
+            }
+        }, SCOPES)
+
+        flow.redirect_uri = get_redirect_uri()
+
+        authorization_url, state = flow.authorization_url(
+            access_type='offline',
+            include_granted_scopes='true'
+        )
+
+        # Store the state in session
+        session['state'] = state
+
+        # Redirect the user to Google's OAuth 2.0 server
+        return redirect(authorization_url)
+
     return creds
+
+
+@app.route('/oauth2callback')
+def oauth2callback():
+    # Get the state from the session
+    state = session['state']
+
+    flow = Flow.from_client_config({
+        "web": {
+            "client_id": os.getenv('GOOGLE_CLIENT_ID'),
+            "project_id": os.getenv('GOOGLE_PROJECT_ID'),
+            "auth_uri": os.getenv('GOOGLE_AUTH_URI', 'https://accounts.google.com/o/oauth2/auth'),
+            "token_uri": os.getenv('GOOGLE_TOKEN_URI', 'https://oauth2.googleapis.com/token'),
+            "auth_provider_x509_cert_url": os.getenv('GOOGLE_AUTH_PROVIDER_CERT_URL', 'https://www.googleapis.com/oauth2/v1/certs'),
+            "client_secret": os.getenv('GOOGLE_CLIENT_SECRET'),
+            "redirect_uris": [get_redirect_uri()]
+        }
+    }, SCOPES, state=state)
+
+    flow.redirect_uri = get_redirect_uri()
+
+    # Get the authorization response from the URL
+    authorization_response = request.url
+    flow.fetch_token(authorization_response=authorization_response)
+
+    # Store credentials in session
+    creds = flow.credentials
+    session['credentials'] = creds_to_dict(creds)
+
+    return redirect(url_for('some_function_after_auth'))
+
+
+def creds_to_dict(creds):
+    return {
+        'token': creds.token,
+        'refresh_token': creds.refresh_token,
+        'token_uri': creds.token_uri,
+        'client_id': creds.client_id,
+        'client_secret': creds.client_secret,
+        'scopes': creds.scopes
+    }
+
 
 # Upload the `.docx` file and convert it to Google Docs format
 def upload_and_convert_to_gdoc(service, template_file):
     logging.info(f"Uploading and converting {template_file} to Google Docs format.")
     file_metadata = {
-        'name': 'Converted Google Doc', 
+        'name': 'Converted Google Doc',
         'mimeType': 'application/vnd.google-apps.document'  # Specify conversion to Google Docs format
     }
     media = MediaFileUpload(template_file, mimetype='application/vnd.openxmlformats-officedocument.wordprocessingml.document')
@@ -67,6 +124,7 @@ def upload_and_convert_to_gdoc(service, template_file):
     document_id = uploaded_file.get('id')
     logging.info(f"Uploaded and converted .docx file. Document ID: {document_id}")
     return document_id
+
 
 # Replace placeholders with "Click here"
 def replace_with_click_here(docs_service, document_id, tag_to_link):
@@ -87,6 +145,7 @@ def replace_with_click_here(docs_service, document_id, tag_to_link):
         logging.info(f"Replaced tags with 'Click here' in document ID: {document_id}")
     except Exception as e:
         logging.error(f"Error replacing text in document: {e}")
+
 
 # Apply hyperlinks and bold styling to "Click here" text
 def apply_hyperlinks(docs_service, document_id, tag_to_link):
@@ -129,6 +188,7 @@ def apply_hyperlinks(docs_service, document_id, tag_to_link):
     except Exception as e:
         logging.error(f"Error applying hyperlinks and styling in document: {e}")
 
+
 # Replace IBO name and ID placeholders
 def replace_ibo_details(docs_service, document_id, ibo_name, ibo_id):
     requests = [
@@ -157,6 +217,7 @@ def replace_ibo_details(docs_service, document_id, ibo_name, ibo_id):
     except Exception as e:
         logging.error(f"Error replacing IBO details in document: {e}")
 
+
 # Share the document by making it public
 def share_google_doc(drive_service, document_id):
     logging.info(f"Sharing Google Doc {document_id} publicly.")
@@ -165,6 +226,7 @@ def share_google_doc(drive_service, document_id):
         body={'role': 'reader', 'type': 'anyone'}
     ).execute()
     logging.info(f"Document shared: https://docs.google.com/document/d/{document_id}/edit")
+
 
 # Main function to generate the Google Doc
 def generate_google_doc(basic_data_filename):
@@ -207,3 +269,7 @@ def generate_google_doc(basic_data_filename):
 
     # Return the Google Doc URL
     return f"https://docs.google.com/document/d/{document_id}/edit"
+
+
+if __name__ == '__main__':
+    app.run(host='0.0.0.0', port=5000, debug=True)
