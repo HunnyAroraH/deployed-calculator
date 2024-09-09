@@ -10,7 +10,7 @@ from dotenv import load_dotenv
 from flask import Flask, redirect, session, url_for, request
 
 app = Flask(__name__)
-app.secret_key = os.getenv("FLASK_SECRET_KEY")  # Ensure you have this in your environment
+app.secret_key = os.getenv('FLASK_SECRET_KEY', 'your_fallback_secret_key')
  
 # Load environment variables (for local development and deployment)
 load_dotenv()
