@@ -8,5 +8,5 @@ psutil == 6.0.0
 google-auth==2.14.1
 google-auth-oauthlib==0.5.3
 google-auth-httplib2==0.1.0
-google-api-python-client==2.67.0
+google-api-python-client==2.39.0
 httplib2==0.20.4
