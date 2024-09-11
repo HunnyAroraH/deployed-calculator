@@ -11,7 +11,6 @@ from selenium.webdriver.support import expected_conditions as EC
 import psutil
 import logging
 import time
-from doc_generator import generate_google_doc
 
 app = Flask(__name__)
 CORS(app, resources={r"/*": {"origins": "*"}})
@@ -174,12 +173,7 @@ def scrape_service_links():
             json.dump(basic_data, f)
         logger.info(f"IBO basic data saved to {basic_data_filename}")
 
-        # Step 4: Call the document generation function from doc_generator.py
-        doc_url = generate_google_doc(basic_data_filename)  # Function from doc.py
-
-        # Return the Google Doc URL after it's created and shared
-        return jsonify({'message': 'Google Doc generated successfully', 'doc_url': doc_url})
-
+        return shop_links
     except Exception as e:
         logger.error(f"An error occurred: {e}")
         return jsonify({'error': 'An error occurred'}), 500
