@@ -173,7 +173,12 @@ def scrape_service_links():
             json.dump(basic_data, f)
         logger.info(f"IBO basic data saved to {basic_data_filename}")
 
-        return shop_links
+        return jsonify({
+            'ibo_name': ibo_name,
+            'ibo_id': ibo_number,
+            'shop_links': shop_links
+        })
+    
     except Exception as e:
         logger.error(f"An error occurred: {e}")
         return jsonify({'error': 'An error occurred'}), 500
